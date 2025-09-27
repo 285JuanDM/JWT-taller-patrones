@@ -1,32 +1,35 @@
-const express = require("express");
-const jwt = require("jsonwebtoken");
+const express = require("express")
+const jwt = require("jsonwebtoken")
 const fs = require("fs");
-const bodyParser = require("body-parser");
+const bodyParser = require("body-parser")
 
 const app = express();
-app.use(bodyParser.json());
+app.use(bodyParser.json())
 
 // Cargar llaves
 const PRIVATE_KEY = fs.readFileSync("private.key", "utf8");
 const PUBLIC_KEY = fs.readFileSync("public.key", "utf8");
 
-// Usuarios de ejemplo (harcodeados para la demo)
-const users = {
-  basic: { password: "1234", role: "basic" },
-  admin: { password: "admin", role: "admin" }
-};
+// Usuarios de ejemplo
+const users = [
+  { username: "juan", password: "1234", role: "basic" },
+  { username: "sofia", password: "admin", role: "admin" }
+]
 
 // Login - genera JWT
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
 
-  if (!users[username] || users[username].password !== password) {
+  const user = users.find(u => u.username === username && u.password === password);
+
+  if (!user) {
     return res.status(401).json({ error: "Credenciales inválidas" });
   }
 
   const payload = {
-    role: users[username].role
-  };
+    username: user.username,
+    role: user.role
+  }
 
   // Expira en 2 minutos
   const token = jwt.sign(payload, PRIVATE_KEY, {
@@ -34,23 +37,24 @@ app.post("/login", (req, res) => {
     expiresIn: "2m"
   });
 
-  res.json({ token });
+  res.json({ token })
 });
+
 
 // Middleware para validar JWT
 function authenticateJWT(req, res, next) {
-  const authHeader = req.headers["authorization"];
+  const authHeader = req.headers["authorization"]
 
-  if (!authHeader) return res.status(403).json({ error: "Token requerido" });
+  if (!authHeader) return res.status(403).json({ error: "Token requerido" })
 
-  const token = authHeader.split(" ")[1];
+  const token = authHeader.split(" ")[1]
 
   jwt.verify(token, PUBLIC_KEY, { algorithms: ["RS256"] }, (err, decoded) => {
-    if (err) return res.status(403).json({ error: "Token inválido o expirado" });
+    if (err) return res.status(403).json({ error: "Token inválido o expirado" })
 
-    req.user = decoded;
-    next();
-  });
+    req.user = decoded
+    next()
+  })
 }
 
 // Middleware para validar roles
@@ -59,19 +63,19 @@ function authorizeRole(roles) {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: "No autorizado" });
     }
-    next();
-  };
+    next()
+  }
 }
 
 // Rutas protegidas
 app.get("/saludo", authenticateJWT, authorizeRole(["basic", "admin"]), (req, res) => {
-  res.send("Hola 👋");
-});
+  res.send("Hola 👋")
+})
 
 app.get("/despido", authenticateJWT, authorizeRole(["admin"]), (req, res) => {
-  res.send("Adiós 👋");
-});
+  res.send("Adiós 👋")
+})
 
 app.listen(3000, () => {
-  console.log("Servidor corriendo en http://localhost:3000");
-});
+  console.log("Servidor corriendo en http://localhost:3000")
+})
